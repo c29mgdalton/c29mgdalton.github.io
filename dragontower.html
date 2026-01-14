@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dragon Tower Simulator</title>
+    <style>
+        :root {
+            --bg-color: #0f212e;
+            --card-bg: #1a2c38;
+            --accent: #00e701;
+            --danger: #ff4d4d;
+            --text-main: #ffffff;
+            --text-muted: #b1bad3;
+            --tile-hidden: #2f4553;
+            --tile-hover: #3e5a6b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 900px;
+            width: 100%;
+            padding: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* Sidebar Controls */
+        .controls {
+            flex: 1;
+            min-width: 300px;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        input, select {
+            background-color: var(--bg-color);
+            border: 2px solid #2f4553;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: var(--text-muted);
+        }
+
+        button.action-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        #playBtn {
+            background-color: var(--accent);
+            color: #000;
+        }
+
+        #cashoutBtn {
+            background-color: #ffd700;
+            color: #000;
+            display: none; /* Hidden until game starts */
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .balance-display {
+            background-color: #0a151d;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 1.2rem;
+            border: 1px solid #2f4553;
+        }
+
+        .balance-value {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        /* Game Board / Tower */
+        .game-area {
+            flex: 2;
+            min-width: 300px;
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .tower-container {
+            display: flex;
+            flex-direction: column-reverse; /* Row 0 is at bottom */
+            gap: 8px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .tower-row {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 5px;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .tower-row.active {
+            background-color: rgba(255, 255, 255, 0.05);
+            transform: scale(1.02);
+            border: 1px solid var(--accent);
+        }
+
+        .tower-row.locked {
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .tile {
+            width: 100%;
+            height: 50px;
+            background-color: var(--tile-hidden);
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+        .tower-row.active .tile:hover {
+            background-color: var(--tile-hover);
+        }
+
+        .tile.revealed-safe {
+            background-color: #fca311; /* Gold/Egg color */
+            color: white;
+            box-shadow: 0 0 10px #fca311;
+        }
+
+        .tile.revealed-bomb {
+            background-color: var(--danger);
+            color: white;
+            box-shadow: 0 0 10px var(--danger);
+        }
+
+        .status-msg {
+            margin-bottom: 15px;
+            height: 20px;
+            font-weight: bold;
+            color: var(--text-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="controls">
+        <div class="balance-display">
+            Balance: <span class="balance-value" id="balanceDisplay">$100.00</span>
+        </div>
+
+        <div class="input-group">
+            <label>Bet Amount</label>
+            <input type="number" id="betInput" value="10" min="1">
+        </div>
+
+        <div class="input-group">
+            <label>Difficulty</label>
+            <select id="difficultySelect">
+                <option value="easy">Easy (3 Tiles, 1 Mine)</option>
+                <option value="hard">Hard (3 Tiles, 2 Mines)</option>
+            </select>
+        </div>
+
+        <button id="playBtn" class="action-btn" onclick="startGame()">Start Game</button>
+        <button id="cashoutBtn" class="action-btn" onclick="cashout()">Cashout</button>
+
+        <div style="margin-top: auto; font-size: 0.8rem; color: #55657e;">
+            *This is a simulation using virtual points only. No real money involved.
+        </div>
+    </div>
+
+    <div class="game-area">
+        <div class="status-msg" id="statusMsg">Press Start to Play</div>
+        <div class="tower-container" id="tower">
+            </div>
+    </div>
+</div>
+
+<script>
+    // Game State
+    let balance = 100.00;
+    let currentBet = 0;
+    let currentRowIndex = 0;
+    let gameActive = false;
+    let towerHeight = 8;
+    let towerWidth = 3;
+    let currentMultipliers = [];
+    
+    // Config
+    const easyMultipliers = [1.42, 2.03, 2.90, 4.16, 5.96, 8.54, 12.25, 17.58]; // Approx for 2/3 chance
+    const hardMultipliers = [2.85, 8.12, 23.15, 66.00, 188.10, 536.00, 1527.00, 4353.00]; // Approx for 1/3 chance
+
+    // DOM Elements
+    const towerEl = document.getElementById('tower');
+    const balanceEl = document.getElementById('balanceDisplay');
+    const statusEl = document.getElementById('statusMsg');
+    const playBtn = document.getElementById('playBtn');
+    const cashoutBtn = document.getElementById('cashoutBtn');
+    const betInput = document.getElementById('betInput');
+    const diffSelect = document.getElementById('difficultySelect');
+
+    // Initialize UI
+    updateBalance(0);
+
+    function updateBalance(amount) {
+        balance += amount;
+        balanceEl.innerText = `$${balance.toFixed(2)}`;
+    }
+
+    function generateMines(difficulty, width) {
+        // Returns an array representing the row [0, 1, 0] where 1 is MINE, 0 is SAFE
+        // Easy = 1 Mine, Hard = 2 Mines
+        let minesCount = difficulty === 'easy' ? 1 : 2;
+        let row = Array(width).fill(0); // 0 = Safe
+        
+        // Randomly place mines
+        let placed = 0;
+        while(placed < minesCount) {
+            let idx = Math.floor(Math.random() * width);
+            if(row[idx] === 0) {
+                row[idx] = 1; // 1 = Mine
+                placed++;
+            }
+        }
+        return row;
+    }
+
+    function startGame() {
+        const betAmount = parseFloat(betInput.value);
+
+        // Validation
+        if (isNaN(betAmount) || betAmount <= 0) {
+            statusEl.innerText = "Please enter a valid bet amount.";
+            statusEl.style.color = "var(--danger)";
+            return;
+        }
+        if (betAmount > balance) {
+            statusEl.innerText = "Insufficient balance!";
+            statusEl.style.color = "var(--danger)";
+            return;
+        }
+
+        // Deduct Bet
+        updateBalance(-betAmount);
+        currentBet = betAmount;
+        gameActive = true;
+        currentRowIndex = 0;
+
+        // Setup Controls
+        playBtn.style.display = 'none';
+        cashoutBtn.style.display = 'none'; // Cannot cashout on row 0
+        betInput.disabled = true;
+        diffSelect.disabled = true;
+
+        // Setup Board
+        const difficulty = diffSelect.value;
+        currentMultipliers = difficulty === 'easy' ? easyMultipliers : hardMultipliers;
+        
+        statusEl.innerText = `Climbing Level 1... (Win: ${(currentBet * currentMultipliers[0]).toFixed(2)})`;
+        statusEl.style.color = "var(--text-muted)";
+
+        renderTower(difficulty);
+    }
+
+    function renderTower(difficulty) {
+        towerEl.innerHTML = '';
+        
+        // Create 8 rows
+        for (let r = 0; r < towerHeight; r++) {
+            const rowDiv = document.createElement('div');
+            rowDiv.classList.add('tower-row');
+            rowDiv.id = `row-${r}`;
+            
+            // Lock all rows except the first one (index 0)
+            if (r !== 0) rowDiv.classList.add('locked');
+            else rowDiv.classList.add('active');
+
+            // Store the secret mine locations in the DOM element for simplicity
+            // (In a real real-money app, this must be server-side!)
+            const mineData = generateMines(difficulty, towerWidth);
+            rowDiv.dataset.mines = JSON.stringify(mineData);
+
+            // Create 3 tiles per row
+            for (let c = 0; c < towerWidth; c++) {
+                const tile = document.createElement('div');
+                tile.classList.add('tile');
+                tile.dataset.col = c;
+                tile.onclick = () => handleTileClick(r, c, tile);
+                rowDiv.appendChild(tile);
+            }
+
+            towerEl.appendChild(rowDiv);
+        }
+    }
+
+    function handleTileClick(rowIdx, colIdx, tileEl) {
+        if (!gameActive) return;
+        if (rowIdx !== currentRowIndex) return; // Can only click active row
+
+        const rowDiv = document.getElementById(`row-${rowIdx}`);
+        const mines = JSON.parse(rowDiv.dataset.mines);
+        const isMine = mines[colIdx] === 1;
+
+        if (isMine) {
+            // --- LOSS ---
+            tileEl.classList.add('revealed-bomb');
+            tileEl.innerHTML = '💣';
+            endGame(false);
+            
+            // Reveal other mines in this row
+            Array.from(rowDiv.children).forEach((t, idx) => {
+                if (mines[idx] === 1) t.innerHTML = '💣';
+                else t.style.opacity = '0.5';
+            });
+        } else {
+            // --- WIN / SAFE ---
+            tileEl.classList.add('revealed-safe');
+            tileEl.innerHTML = '🥚'; // Dragon Egg
+            
+            // Disable this row to prevent double clicking
+            rowDiv.classList.remove('active');
+            rowDiv.classList.add('locked'); // Visually lock it as "passed"
+            // Actually, we want to keep it visible but unclickable. 
+            // The logic "currentRowIndex" handles the clickability.
+
+            // Check if top reached
+            if (currentRowIndex === towerHeight - 1) {
+                cashout(true); // Auto cashout at top
+            } else {
+                // Move to next row
+                currentRowIndex++;
+                const nextRow = document.getElementById(`row-${currentRowIndex}`);
+                nextRow.classList.remove('locked');
+                nextRow.classList.add('active');
+                
+                // Update Potential
+                const nextMult = currentMultipliers[currentRowIndex];
+                const prevMult = currentMultipliers[currentRowIndex - 1];
+                const currentWin = (currentBet * prevMult).toFixed(2);
+                
+                statusEl.innerText = `Current Win: $${currentWin} | Next: ${(currentBet * nextMult).toFixed(2)}`;
+                statusEl.style.color = "var(--accent)";
+
+                // Enable Cashout button
+                cashoutBtn.style.display = 'block';
+                cashoutBtn.innerText = `Cashout $${currentWin}`;
+            }
+        }
+    }
+
+    function cashout(maxWin = false) {
+        if (!gameActive) return;
+
+        let multiplier;
+        if (maxWin) {
+            multiplier = currentMultipliers[towerHeight - 1];
+        } else {
+            // Cashout the PREVIOUS completed level
+            // If we are on row index 1, we beat row 0.
+            multiplier = currentMultipliers[currentRowIndex - 1];
+        }
+
+        const winAmount = currentBet * multiplier;
+        updateBalance(winAmount);
+        
+        statusEl.innerText = `YOU WON $${winAmount.toFixed(2)}!`;
+        statusEl.style.color = "#ffd700"; // Gold
+        
+        // Visual cleanup
+        endGame(true);
+    }
+
+    function endGame(hasWon) {
+        gameActive = false;
+        playBtn.style.display = 'block';
+        cashoutBtn.style.display = 'none';
+        betInput.disabled = false;
+        diffSelect.disabled = false;
+
+        if (!hasWon) {
+            statusEl.innerText = "Game Over! You hit a bomb.";
+            statusEl.style.color = "var(--danger)";
+        }
+    }
+</script>
+
+</body>
+</html>

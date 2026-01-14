@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>mines and plinker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #0f212e;
+            --panel: #1a2c38;
+            --tile: #2f4553;
+            --win: #00e701;
+            --loss: #ff4d4d;
+            --accent: #2196F3;
+            --stop: #ff9800;
+        }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0a1014;
+            color: white;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Nav Toggle */
+        .game-nav {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            background: var(--panel);
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid var(--tile);
+        }
+        .nav-btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            background: var(--tile);
+            color: white;
+            transition: 0.3s;
+        }
+        .nav-btn.active { background: var(--win); color: black; }
+
+        .game-wrapper { display: none; width: 100%; max-width: 1100px; padding: 20px; gap: 20px; }
+        .game-wrapper.active { display: flex; }
+
+        /* Shared Sidebar Elements */
+        .sidebar { background: var(--bg); padding: 20px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; flex: 0 0 350px; }
+        .analytics-panel { flex: 1; background: var(--bg); padding: 20px; border-radius: 12px; display: flex; flex-direction: column; }
+       
+        /* PLINKO SPECIFIC STYLES */
+        #plinko-canvas-container { position: relative; background: #0f1218; border-radius: 10px; margin-bottom: 20px; width: 500px; height: 650px; }
+        #multiplier-labels { position: absolute; bottom: 15px; left: 0; width: 100%; display: flex; justify-content: center; pointer-events: none; }
+        .m-label { width: 32px; margin: 0 1px; text-align: center; font-size: 8px; font-weight: bold; background: #2e333d; border-radius: 3px; padding: 6px 0; color: #ffc107; border: 1px solid #3d424a; }
+
+        /* MINES SPECIFIC STYLES */
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-gap: 8px; margin-bottom: 20px; }
+        .tile { aspect-ratio: 1/1; background: var(--tile); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; border: none; color: white; transition: 0.2s; }
+        .tile.selected { border: 2px solid var(--accent); background: #3d5a6f; }
+        .tile.revealed { background: var(--win); color: var(--bg); animation: pulse 0.4s; }
+        .tile.mine { background: var(--loss); animation: shake 0.3s; }
+
+        /* Controls */
+        .controls { display: flex; flex-direction: column; gap: 8px; }
+        input, button { padding: 12px; border-radius: 6px; border: none; font-weight: bold; width: 100%; box-sizing: border-box; }
+        .primary-btn { background: var(--win); color: var(--bg); cursor: pointer; }
+        .auto-btn { background: var(--accent); color: white; cursor: pointer; }
+        .label { font-size: 11px; text-align: left; color: #b1bad3; text-transform: uppercase; margin-top: 5px; }
+       
+        .switch { position: relative; display: inline-block; width: 34px; height: 18px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #0a1014; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--win); }
+        input:checked + .slider:before { transform: translateX(16px); }
+
+        .stat-val { display: block; font-size: 18px; color: white; font-weight: bold; }
+        .stat-box { background: #1a2c38; padding: 10px; border-radius: 8px; text-align: center; font-size: 11px; color: #b1bad3; flex: 1; }
+       
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div class="game-nav">
+    <button class="nav-btn active" id="btn-plinko" onclick="switchGame('plinko')">PLINKO</button>
+    <button class="nav-btn" id="btn-mines" onclick="switchGame('mines')">MINES</button>
+</div>
+
+<div id="plinko-wrapper" class="game-wrapper active">
+    <div class="sidebar">
+        <div class="label">Balance</div>
+        <div style="font-size: 24px; color: var(--win); margin-bottom: 20px; font-weight: bold;">$<span class="shared-balance">100.00</span></div>
+       
+        <div class="controls">
+            <p class="label">Risk Level</p>
+            <select id="riskSelect" onchange="initPlinko()" style="padding:12px; background:var(--panel); color:white; border-radius:6px; border:none; width:100%;">
+                <option value="low">Low Risk</option>
+                <option value="med">Medium Risk</option>
+                <option value="high" selected>High Risk (1000x)</option>
+            </select>
+            <p class="label">Bet Amount</p>
+            <input type="number" id="plinkoBet" value="1.00" step="0.5">
+            <button class="primary-btn" onclick="playPlinko()">Drop Ball</button>
+            <button id="plinkoAutoBtn" class="auto-btn" onclick="togglePlinkoAuto()">Auto Play: OFF</button>
+        </div>
+    </div>
+    <div id="plinko-canvas-container">
+        <div id="plinko-canvas"></div>
+        <div id="multiplier-labels"></div>
+    </div>
+</div>
+
+<div id="mines-wrapper" class="game-wrapper">
+    <div class="sidebar">
+        <div class="label">Balance</div>
+        <div style="font-size: 24px; color: var(--win); margin-bottom: 20px; font-weight: bold;">$<span class="shared-balance">100.00</span></div>
+        <div id="mines-multiplier" style="font-size: 1.2rem; margin-bottom: 10px;">1.00x</div>
+        <div id="mines-status" style="height: 25px; font-size: 13px; color: #b1bad3;">Pick tiles & Play</div>
+        <div class="grid" id="mines-grid"></div>
+        <div class="controls">
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#2f4553; padding:8px; border-radius:6px;">
+                <span style="font-size:13px">Fast Mode</span>
+                <label class="switch"><input type="checkbox" id="speedMode"><span class="slider"></span></label>
+            </div>
+            <p class="label">Bet Amount</p>
+            <input type="number" id="minesBet" value="5">
+            <button id="manualBtn" class="primary-btn" onclick="startManualRound()">Manual Bet</button>
+            <button id="cashoutBtn" class="primary-btn" style="display:none;" onclick="cashOutManual()">Cash Out</button>
+            <button id="autoBtn" class="auto-btn" onclick="toggleContinuous(true)">Continuous Autoplay</button>
+            <button id="stopBtn" style="display:none; background:var(--stop); color:white;" onclick="toggleContinuous(false)">Stop Autoplay</button>
+           
+            <div style="background: #1a2c38; padding: 10px; border-radius: 8px; margin-top: 10px; border: 1px solid #2f4553;">
+                <p class="label" style="margin:0 0 10px 0;">Safety Nets</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size: 12px;">Min Balance</span>
+                    <div style="display:flex; gap:5px;"><input type="number" id="stopLossLimit" value="50" style="width:60px; padding:5px;"><label class="switch"><input type="checkbox" id="stopLossActive"><span class="slider"></span></label></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-size: 12px;">Max Balance</span>
+                    <div style="display:flex; gap:5px;"><input type="number" id="takeProfitLimit" value="200" style="width:60px; padding:5px;"><label class="switch"><input type="checkbox" id="takeProfitActive"><span class="slider"></span></label></div>
+                </div>
+            </div>
+            <p class="label">Mines (1-24)</p>
+            <input type="number" id="mineCount" value="3" min="1" max="24">
+        </div>
+    </div>
+    <div class="analytics-panel">
+        <h3 style="margin: 0 0 15px 0; color: #b1bad3; font-size: 14px;">LIVE PERFORMANCE ANALYTICS</h3>
+        <div style="flex: 1; min-height: 300px;"><canvas id="balanceChart"></canvas></div>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <div class="stat-box">GAMES<span class="stat-val" id="totalGames">0</span></div>
+            <div class="stat-box">WINS<span class="stat-val" id="totalWins" style="color:var(--win)">0</span></div>
+            <div class="stat-box">LOSSES<span class="stat-val" id="totalLosses" style="color:var(--loss)">0</span></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // SHARED STATE
+    let balance = 100.00;
+    let balanceHistory = [100.00];
+
+    function updateSharedBalance(newVal) {
+        balance = newVal;
+        document.querySelectorAll('.shared-balance').forEach(el => el.innerText = balance.toFixed(2));
+        updateChart();
+    }
+
+    function switchGame(game) {
+        document.querySelectorAll('.game-wrapper').forEach(w => w.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`${game}-wrapper`).classList.add('active');
+        document.getElementById(`btn-${game}`).classList.add('active');
+        if(game === 'plinko') initPlinko();
+    }
+
+    // ================= PLINKO ORIGINAL CODE =================
+    const { Engine, Render, Runner, Bodies, Composite, Events } = Matter;
+    let pEngine, pRender, pRunner, pAutoInterval = null;
+
+    const pRiskModes = {
+        low:  [5, 2, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 2, 5],
+        med:  [10, 5, 2, 1, 0.5, 0.2, 0.5, 1, 2, 5, 10],
+        high: [150, 10, 5, 0, 0, 0, 0, 0, 0, 5, 10, 150]
+    };
+
+    function initPlinko() {
+        if (pRender) { Render.stop(pRender); Runner.stop(pRunner); Composite.clear(pEngine.world); Engine.clear(pEngine); document.getElementById('plinko-canvas').innerHTML = ''; }
+        pEngine = Engine.create();
+        pEngine.gravity.y = 1.2;
+        const risk = document.getElementById('riskSelect').value;
+        const mults = pRiskModes[risk];
+        pRender = Render.create({ element: document.getElementById('plinko-canvas'), engine: pEngine, options: { width: 500, height: 650, wireframes: false, background: 'transparent' } });
+        Composite.add(pEngine.world, [Bodies.rectangle(5, 325, 15, 650, { isStatic: true, render: { fillStyle: '#1a1d23' } }), Bodies.rectangle(495, 325, 15, 650, { isStatic: true, render: { fillStyle: '#1a1d23' } })]);
+        for (let i = 0; i < 16; i++) {
+            for (let j = 0; j <= i; j++) {
+                Composite.add(pEngine.world, Bodies.circle(250 + (j - i / 2) * 32, 60 + i * 34, 3, { isStatic: true, label: 'peg', render: { fillStyle: '#4d5461' }, restitution: 1.1 }));
+            }
+        }
+        const labelContainer = document.getElementById('multiplier-labels');
+        labelContainer.innerHTML = '';
+        mults.forEach((m, i) => {
+            const x = (250 - (mults.length / 2) * 36 + (36 / 2)) + i * 36;
+            Composite.add(pEngine.world, Bodies.rectangle(x, 620, 34, 40, { isStatic: true, isSensor: true, label: `m-${m}`, render: { fillStyle: '#2e333d' } }));
+            labelContainer.innerHTML += `<div class="m-label">${m}x</div>`;
+        });
+        Render.run(pRender);
+        pRunner = Runner.run(Runner.create(), pEngine);
+        Events.on(pEngine, 'collisionStart', (e) => {
+            e.pairs.forEach(p => {
+                const ball = p.bodyA.label === 'ball' ? p.bodyA : (p.bodyB.label === 'ball' ? p.bodyB : null);
+                const sensor = p.bodyA.label.startsWith('m-') ? p.bodyA : (p.bodyB.label.startsWith('m-') ? p.bodyB : null);
+                if (ball && sensor) {
+                    const m = parseFloat(sensor.label.split('-')[1]);
+                    updateSharedBalance(balance + (ball.bet * m));
+                    balanceHistory.push(Number(balance.toFixed(2)));
+                    Composite.remove(pEngine.world, ball);
+                }
+            });
+        });
+    }
+
+    function playPlinko() {
+        const bet = parseFloat(document.getElementById('plinkoBet').value);
+        if (bet > balance || bet <= 0) return;
+        updateSharedBalance(balance - bet);
+        const ball = Bodies.circle(250 + (Math.random()-0.5)*5, 20, 6, { restitution: 0.7, friction: 0.001, frictionAir: 0.07, mass: 0.6, label: 'ball', render: { fillStyle: '#ffc107' } });
+        ball.bet = bet;
+        Composite.add(pEngine.world, ball);
+    }
+
+    function togglePlinkoAuto() {
+        const btn = document.getElementById('plinkoAutoBtn');
+        if (pAutoInterval) { clearInterval(pAutoInterval); pAutoInterval = null; btn.innerText = "Auto Play: OFF"; }
+        else { btn.innerText = "Auto Play: ON"; playPlinko(); pAutoInterval = setInterval(playPlinko, 500); }
+    }
+
+    // ================= MINES ORIGINAL CODE =================
+    let isContinuous = false, isManualActive = false, isGameOver = true;
+    let autoSelectedTiles = new Set(), mines = [];
+    let stats = { games: 0, wins: 0, losses: 0 };
+    const chartCtx = document.getElementById('balanceChart').getContext('2d');
+    const chart = new Chart(chartCtx, { type: 'line', data: { labels: ['0'], datasets: [{ label: 'Balance', data: [100.00], segment: { borderColor: ctx => ctx.p0.parsed.y > ctx.p1.parsed.y ? '#ff4d4d' : '#00e701' }, tension: 0.1, fill: false, pointRadius: 2, borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { grid: { color: '#2f4553' }, ticks: { color: '#b1bad3' } } }, plugins: { legend: { display: false } } } });
+
+    function createGrid() {
+        const gridEl = document.getElementById('mines-grid'); gridEl.innerHTML = '';
+        for (let i = 1; i <= 25; i++) {
+            const btn = document.createElement('button'); btn.className = 'tile'; if (autoSelectedTiles.has(i)) btn.classList.add('selected'); btn.dataset.id = i;
+            btn.onclick = () => { if (isGameOver) { autoSelectedTiles.has(i) ? autoSelectedTiles.delete(i) : autoSelectedTiles.add(i); btn.classList.toggle('selected'); } else if (isManualActive) revealTile(i, btn); };
+            gridEl.appendChild(btn);
+        }
+    }
+
+    function setupRound() {
+        if (isContinuous) {
+            if (document.getElementById('stopLossActive').checked && balance < parseFloat(document.getElementById('stopLossLimit').value)) return false;
+            if (document.getElementById('takeProfitActive').checked && balance > parseFloat(document.getElementById('takeProfitLimit').value)) return false;
+        }
+        const bet = parseFloat(document.getElementById('minesBet').value);
+        if (bet > balance || bet <= 0) return false;
+        updateSharedBalance(balance - bet);
+        isGameOver = false; mines = [];
+        const mCount = parseInt(document.getElementById('mineCount').value);
+        while(mines.length < mCount) { let r = Math.floor(Math.random() * 25) + 1; if(!mines.includes(r)) mines.push(r); }
+        createGrid(); return true;
+    }
+
+    function startManualRound() { if (!setupRound()) return; isManualActive = true; document.getElementById('manualBtn').style.display = 'none'; document.getElementById('cashoutBtn').style.display = 'block'; document.getElementById('autoBtn').disabled = true; }
+   
+    function revealTile(id, btn) {
+        if (isGameOver || btn.classList.contains('revealed')) return;
+        if (mines.includes(id)) { btn.classList.add('mine'); btn.innerText = '💣'; endRound(false); }
+        else { btn.classList.add('revealed'); btn.innerText = '💎'; const hits = document.querySelectorAll('.revealed').length; const m = calculateMultiplier(hits, mines.length); document.getElementById('mines-multiplier').innerText = m.toFixed(2) + "x"; document.getElementById('cashoutBtn').innerText = `Cash Out ($${(parseFloat(document.getElementById('minesBet').value) * m).toFixed(2)})`; }
+    }
+
+    function cashOutManual() { const hits = document.querySelectorAll('.revealed').length; if (hits === 0) return; updateSharedBalance(balance + (parseFloat(document.getElementById('minesBet').value) * calculateMultiplier(hits, mines.length))); endRound(true); }
+
+    async function toggleContinuous(start) {
+        if (start && autoSelectedTiles.size === 0) return alert("Select a pattern first!");
+        isContinuous = start; document.getElementById('autoBtn').style.display = start ? 'none' : 'block'; document.getElementById('stopBtn').style.display = start ? 'block' : 'none'; document.getElementById('manualBtn').disabled = start;
+        while (isContinuous) {
+            const delay = document.getElementById('speedMode').checked ? 30 : 100;
+            const roundDelay = document.getElementById('speedMode').checked ? 200 : 800;
+            if (!setupRound()) { toggleContinuous(false); break; }
+            let hitMine = false;
+            for (let tileId of autoSelectedTiles) {
+                if (!isContinuous) break; await new Promise(r => setTimeout(r, delay));
+                const btn = document.querySelector(`[data-id='${tileId}']`);
+                if (mines.includes(tileId)) { hitMine = true; btn.classList.add('mine'); btn.innerText = '💣'; break; }
+                else { btn.classList.add('revealed'); btn.innerText = '💎'; }
+            }
+            if (!hitMine && isContinuous) { updateSharedBalance(balance + (parseFloat(document.getElementById('minesBet').value) * calculateMultiplier(autoSelectedTiles.size, mines.length))); endRound(true); } else if (hitMine) endRound(false);
+            if (isContinuous) await new Promise(r => setTimeout(r, roundDelay));
+        }
+    }
+
+    function endRound(win) {
+        isGameOver = true; isManualActive = false; document.getElementById('manualBtn').style.display = 'block'; document.getElementById('cashoutBtn').style.display = 'none'; document.getElementById('autoBtn').disabled = false;
+        document.querySelectorAll('.tile').forEach(t => { if (mines.includes(parseInt(t.dataset.id))) { t.classList.add('mine'); t.innerText = '💣'; } });
+        win ? stats.wins++ : stats.losses++; stats.games++; balanceHistory.push(Number(balance.toFixed(2))); updateMinesStats();
+    }
+
+    function calculateMultiplier(hits, mineCount) { let mult = 0.98; for (let i = 0; i < hits; i++) mult *= (25 - i) / (25 - mineCount - i); return mult; }
+
+    function updateMinesStats() {
+        document.getElementById('totalGames').innerText = stats.games;
+        document.getElementById('totalWins').innerText = stats.wins;
+        document.getElementById('totalLosses').innerText = stats.losses;
+        updateChart();
+    }
+
+    function updateChart() {
+        chart.data.labels = balanceHistory.map((_, i) => i);
+        chart.data.datasets[0].data = balanceHistory;
+        chart.update('none');
+    }
+
+    initPlinko();
+    createGrid();
+</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style type="text/css">
+	
+#sos{
+
+width: 500px;
+height: 300px;
+background-color: mediumvioletred;
+/*animation-name: wobble;*/
+animation-duration: 5s;
+animation-iteration-count: 2;
+margin: 300px;
+margin-left: 400px;
+}
+@keyframes wobble{
+
+0%{
+transform: translate(20px);
+}
+50%{
+transform: translate(-40px);
+}
+100%{
+transform: translate(20px);
+}
+
+}
+
+
+
+
+
+
+</style>
+
+</head>
+<body>
+
+<div id="sos">
+	
+<script type="text/javascript">
+	
+sos.AddEventListener("click", function(){
+sos.style.animationName="wobble"
+
+
+})
+
+</script>
+
+</div>
+
+
+
+
+</body>
+</html>

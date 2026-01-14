@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<style type="text/css">
+		
+		.squares{
+ 			width: 12px;
+			height:  19px;
+			border: 1px solid black;
+
+		}
+
+	</style>
+</head>
+<body>
+<script type="text/javascript">
+	
+function createBoxes (){
+
+let boxes = document.createElement("div")
+boxes.classList.add("squares")
+document.body.appendChild(boxes)
+
+
+}
+
+setInterval(createBoxes, 300)
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chromagen Dark</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --primary: #38bdf8;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      text-align: center;
+      transition: filter 0.5s ease;
+      padding-bottom: 80px;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 50px 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-weight: 800;
+      font-size: 3rem;
+      margin: 0 0 10px 0;
+      letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #a78bfa, #2dd4bf);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.2));
+    }
+
+    p.subtitle { color: var(--text-muted); margin-bottom: 40px; font-size: 1.1rem; }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    button, select {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      padding: 12px 24px;
+      border-radius: 50px;
+      border: 1px solid var(--border);
+      background-color: var(--card-bg);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+    }
+
+    button:hover, select:hover {
+      border-color: var(--primary);
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.15);
+      transform: translateY(-2px);
+    }
+
+    button.primary-action {
+      background: linear-gradient(135deg, var(--primary), #818cf8);
+      color: #0f172a;
+      border: none;
+      font-weight: 700;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+    }
+
+    button.primary-action:hover {
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.5);
+      transform: translateY(-2px) scale(1.02);
+    }
+
+    select {
+      appearance: none;
+      padding-right: 40px;
+      background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394a3b8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+      background-repeat: no-repeat;
+      background-position: right 15px top 50%;
+      background-size: 10px auto;
+    }
+
+    /* Grid & Cards */
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .color-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      opacity: 0; 
+      animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+    
+    @keyframes fadeInUp {
+      0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .color-swatch {
+      height: 160px;
+      width: 100%;
+      position: relative;
+      cursor: pointer;
+      transition: filter 0.2s;
+    }
+    
+    .color-swatch:hover { filter: brightness(1.1); }
+
+    .card-actions {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .code-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background: rgba(0,0,0,0.2);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .code-row:hover {
+      background: rgba(255,255,255,0.05);
+      border-color: var(--border);
+      color: var(--primary);
+    }
+
+    .star-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(0, 0, 0, 0.4);
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      color: rgba(255,255,255,0.7);
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      transition: all 0.2s;
+      opacity: 0;
+      transform: scale(0.8);
+    }
+
+    .color-swatch:hover .star-btn, .star-btn.favorited {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .star-btn:hover { background: rgba(0, 0, 0, 0.7); color: white; }
+    .star-btn.favorited { background: var(--card-bg); color: #fbbf24; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+    /* Favorites Section */
+    .favorites-section {
+      margin-top: 80px;
+      padding: 0 20px;
+      border-top: 1px solid var(--border);
+      max-width: 1000px;
+      margin-left: auto;
+      margin-right: auto;
+      padding-top: 40px;
+    }
+
+    .fav-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .fav-box {
+      width: 70px;
+      height: 70px;
+      border-radius: 14px;
+      border: 2px solid var(--card-bg);
+      cursor: pointer;
+      transition: transform 0.2s, opacity 0.3s;
+      position: relative;
+    }
+    
+    .fav-box:hover { transform: scale(1.1); z-index: 5; }
+
+    /* The REMOVE Button (X) */
+    .remove-fav-btn {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 22px;
+        height: 22px;
+        background-color: #ef4444; /* Red */
+        color: white;
+        border-radius: 50%;
+        font-size: 14px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.2s, transform 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .remove-fav-btn:hover {
+        background-color: #dc2626;
+        transform: scale(1.1);
+    }
+
+    .fav-box:hover .remove-fav-btn {
+        opacity: 1;
+    }
+
+    /* Toast */
+    #toast {
+      visibility: hidden;
+      min-width: 280px;
+      background-color: var(--primary);
+      color: #0f172a;
+      font-weight: 600;
+      border-radius: 50px;
+      padding: 14px 20px;
+      position: fixed;
+      z-index: 100;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%) translateY(20px);
+      font-size: 14px;
+      opacity: 0;
+      transition: all 0.3s;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+    }
+
+    #toast.show { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); bottom: 40px; }
+
+    /* Sparks */
+    .spark {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: #fbbf24;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: spark-anim 0.6s ease-out forwards;
+      z-index: 20;
+      box-shadow: 0 0 10px gold;
+    }
+
+    @keyframes spark-anim {
+      0% { transform: scale(1) translate(0, 0); opacity: 1; }
+      100% { transform: scale(0) translate(var(--x), var(--y)); opacity: 0; }
+    }
+  </style>
+</head>
+<body id="body">
+
+  <header>
+    <h1>Chromagen Dark</h1>
+    <p class="subtitle">Generate, explore, and collect.</p>
+    
+    <div class="controls">
+      <button class="primary-action" onclick="generateColors()">⚡ Generate Palette</button>
+      <select id="colorSelect" onchange="generateColors()">
+        <option value="">Random Mix</option>
+        <option value="neon">Neon Vibes</option>
+        <option value="pastel">Dark Pastels</option>
+        <option value="red">Red Hues</option>
+        <option value="green">Green Hues</option>
+        <option value="blue">Blue Hues</option>
+        <option value="purple">Purple Hues</option>
+        <option value="monochrome">Monochrome</option>
+      </select>
+      <button onclick="toggleGrayscale()">Toggle Grayscale</button>
+    </div>
+  </header>
+
+  <main class="grid-container" id="grid"></main>
+
+  <div class="favorites-section">
+    <div style="margin-bottom: 20px; font-weight: 600; color: var(--text-muted);">
+       ★ YOUR COLLECTION
+    </div>
+    <div id="favorites" class="fav-grid"></div>
+  </div>
+
+  <div id="toast">Copied to clipboard!</div>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const favoritesContainer = document.getElementById('favorites');
+    const toast = document.getElementById('toast');
+    const colorSelect = document.getElementById('colorSelect');
+    let isGrayscale = false;
+
+    window.onload = generateColors;
+
+    function generateColors() {
+      grid.innerHTML = '';
+      const mode = colorSelect.value;
+      for (let i = 0; i < 20; i++) {
+        let hex;
+        if (mode === 'monochrome') hex = generateMonochrome();
+        else if (mode === 'neon') hex = generateNeon();
+        else if (mode === 'pastel') hex = generatePastel();
+        else if (mode) hex = generateShade(mode);
+        else hex = getRandomColor();
+        createColorCard(hex, i);
+      }
+    }
+
+    function createColorCard(hex, index) {
+      const rgb = hexToRgb(hex);
+      const card = document.createElement('div');
+      card.className = 'color-card';
+      card.style.animationDelay = `${index * 50}ms`;
+      
+      // Check if this color is already favorited to keep star filled
+      const isFav = document.getElementById(`fav-${hex.replace('#','')}`);
+      const starClass = isFav ? 'star-btn favorited' : 'star-btn';
+
+      card.innerHTML = `
+        <div class="color-swatch" style="background-color: ${hex};" onclick="copyToClipboard('${hex}')">
+            <button class="${starClass}" data-hex="${hex}" onclick="event.stopPropagation(); toggleFavorite(this, '${hex}')">★</button>
+        </div>
+        <div class="card-actions">
+            <div class="code-row" onclick="copyToClipboard('${hex}')"><span>HEX</span><span>${hex}</span></div>
+            <div class="code-row" onclick="copyToClipboard('${rgb}')"><span>RGB</span><span>${rgb}</span></div>
+        </div>
+      `;
+      grid.appendChild(card);
+    }
+
+    function toggleFavorite(btn, hex) {
+      const isFav = btn.classList.contains('favorited');
+      const cleanHexId = hex.replace('#', '');
+
+      if (isFav) {
+        // Untoggle (Remove)
+        btn.classList.remove('favorited');
+        removeFavoriteElement(cleanHexId);
+      } else {
+        // Toggle (Add)
+        btn.classList.add('favorited');
+        createSparks(btn);
+        
+        if(!document.getElementById(`fav-${cleanHexId}`)) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'fav-box';
+            wrapper.id = `fav-${cleanHexId}`;
+            wrapper.style.backgroundColor = hex;
+            
+            // Click the box to Copy
+            wrapper.onclick = () => copyToClipboard(hex);
+
+            // The X Button
+            const closeBtn = document.createElement('div');
+            closeBtn.className = 'remove-fav-btn';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = (e) => {
+                e.stopPropagation(); // Stop bubbling (prevent copy)
+                removeFavoriteElement(cleanHexId); // Remove logic
+            };
+
+            wrapper.appendChild(closeBtn);
+            favoritesContainer.appendChild(wrapper);
+        }
+      }
+    }
+
+    // Helper to remove favorite from bottom list AND uncheck grid star
+    function removeFavoriteElement(cleanHexId) {
+        // 1. Remove from Collection List
+        const favItem = document.getElementById(`fav-${cleanHexId}`);
+        if (favItem) {
+            favItem.style.opacity = '0';
+            favItem.style.transform = 'scale(0)';
+            setTimeout(() => favItem.remove(), 250);
+        }
+
+        // 2. Uncheck the Star in the Main Grid (if it exists)
+        // We use data-hex to find the specific button
+        const gridBtn = document.querySelector(`.star-btn[data-hex="#${cleanHexId}"]`);
+        if (gridBtn) {
+            gridBtn.classList.remove('favorited');
+        }
+    }
+
+    // --- Utility & Logic ---
+    function getRandomColor() {
+      const h = Math.floor(Math.random() * 360);
+      const s = Math.floor(Math.random() * 30) + 70; 
+      const l = Math.floor(Math.random() * 40) + 50; 
+      return hslToHex(h, s, l);
+    }
+    function generateNeon() { return hslToHex(Math.floor(Math.random() * 360), 100, 60); }
+    function generatePastel() { return hslToHex(Math.floor(Math.random() * 360), 60, 80); }
+    function generateMonochrome() { const v = Math.floor(Math.random() * 150) + 50; return rgbToHex(`rgb(${v}, ${v}, ${v})`); }
+    function generateShade(name) {
+      let baseH;
+      switch (name) {
+        case "red": baseH = 0; break;
+        case "green": baseH = 120; break;
+        case "blue": baseH = 220; break;
+        case "purple": baseH = 270; break;
+      }
+      const h = (baseH + Math.floor(Math.random() * 40 - 20) + 360) % 360;
+      return hslToHex(h, Math.floor(Math.random() * 40) + 60, Math.floor(Math.random() * 40) + 40);
+    }
+    function toggleGrayscale() {
+      isGrayscale = !isGrayscale;
+      document.body.style.filter = isGrayscale ? "grayscale(100%)" : "none";
+    }
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`Copied ${text}`);
+      });
+    }
+    function showToast(msg) {
+      toast.innerText = msg;
+      toast.className = "show";
+      setTimeout(() => toast.className = "", 2500);
+    }
+    function createSparks(origin) {
+      for (let i = 0; i < 8; i++) {
+        const spark = document.createElement('div');
+        spark.className = 'spark';
+        const a = Math.random() * 2 * Math.PI;
+        const d = 30 + Math.random() * 20;
+        spark.style.setProperty('--x', `${Math.cos(a) * d}px`);
+        spark.style.setProperty('--y', `${Math.sin(a) * d}px`);
+        origin.appendChild(spark);
+        setTimeout(() => spark.remove(), 600);
+      }
+    }
+    function hslToHex(h, s, l) {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = n => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+    }
+    function hexToRgb(hex) {
+      const b = parseInt(hex.slice(1), 16);
+      return `rgb(${(b >> 16) & 255}, ${(b >> 8) & 255}, ${b & 255})`;
+    }
+    function rgbToHex(rgbStr) {
+      const [r, g, b] = rgbStr.match(/\d+/g).map(Number);
+      return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+    }
+  </script>
+</body>
+</html>

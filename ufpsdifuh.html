@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Volleyball Legends V40: 750ms Delay & Aggressive Start</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; user-select: none; }
+        
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #main-menu {
+            pointer-events: auto;
+            background: rgba(0,0,0,0.9);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            border: 2px solid #ffaa00;
+            box-shadow: 0 0 30px rgba(255, 170, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .menu-btn {
+            background: #222;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .menu-btn:hover { background: #ffaa00; color: #111; border-color: #fff; }
+
+        #crosshair {
+            width: 6px; height: 6px;
+            background: #fff;
+            border: 2px solid #000;
+            border-radius: 50%;
+            display: none;
+        }
+
+        .hud-bottom {
+            position: absolute; bottom: 20px;
+            color: #aaa; font-size: 13px;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 25px;
+            border-radius: 30px;
+            border-top: 2px solid #333;
+            display: none;
+        }
+
+        .key {
+            display: inline-block; background: #222; color: #fff;
+            padding: 3px 8px; border-radius: 4px; font-weight: bold;
+            margin: 0 4px; border: 1px solid #444; box-shadow: 0 2px 0 #000;
+        }
+        
+        h1 { margin: 0; color: #ffaa00; text-transform: uppercase; letter-spacing: 2px; }
+    </style>
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        
+        <div id="main-menu">
+            <h1>Volleyball Legends V40</h1>
+            <p style="color:#bbb;">Update: 750ms Delay & Aggressive Start</p>
+            <button class="menu-btn" id="btn-normal">Normal Style<br><span style="font-size:12px; color:#aaa; font-weight:normal;">Standard Physics</span></button>
+            <button class="menu-btn" id="btn-curve">Pro Physics<br><span style="font-size:12px; color:#aaa; font-weight:normal;">Late Curve & Pinball Net</span></button>
+        </div>
+
+        <div id="crosshair"></div>
+        <div class="hud-bottom" id="hud">
+            <span class="key">G</span> SPAWN
+            <span class="key">E</span> SET (STOPS BALL)
+            <span class="key">L-CLICK</span> SPIKE
+            <span class="key">WASD</span> MOVE / AIM
+            <span id="style-indicator" style="margin-left:15px; color:#ffaa00; font-weight:bold;"></span>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- GLOBAL STATE ---
+        let GAME_STYLE = 'NORMAL'; 
+        let isGameRunning = false;
+
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            gravity: 0.012,
+            moveSpeed: 0.22,
+            jumpForce: 0.42,
+            friction: 0.82,
+            airDrag: 0.99,
+            
+            hitRadius: 5.0, 
+            ballRadius: 0.75,
+            
+            spikePower: 0.45,  
+            setPower: 0.48,    
+            
+            curveStrength: 0.0006, 
+            
+            courtW: 6.0,
+            courtL: 12.0,
+            lineThick: 0.2,
+            sensitivity: 0.002,
+            
+            netHeight: 2.43,
+            netWidth: 12.5, 
+            netDepth: 0.1
+        };
+
+        // --- SCENE ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111); 
+        scene.fog = new THREE.Fog(0x111111, 10, 80);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // --- LIGHTS ---
+        const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambient);
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        sun.position.set(5, 30, 5);
+        sun.castShadow = true;
+        scene.add(sun);
+
+        // --- ASSETS ---
+        const mFloor = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 });
+        const mLine = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const mNet = new THREE.MeshStandardMaterial({ color: 0x00ffcc, opacity: 0.3, transparent: true, side: THREE.DoubleSide });
+        const mPlayer = new THREE.MeshStandardMaterial({ color: 0x4facfe });
+        const mBall = new THREE.MeshStandardMaterial({ color: 0xffcc00, emissive: 0x443300 });
+
+        // --- COURT ---
+        const courtGroup = new THREE.Group();
+        scene.add(courtGroup);
+
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), mFloor);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        courtGroup.add(floor);
+
+        function createLine(w, h, x, z) {
+            const line = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mLine);
+            line.rotation.x = -Math.PI / 2;
+            line.position.set(x, 0.02, z);
+            courtGroup.add(line);
+        }
+
+        const W = CONFIG.courtW;
+        const L = CONFIG.courtL;
+        const T = CONFIG.lineThick;
+        createLine(T, L * 2, -W, 0); 
+        createLine(T, L * 2, W, 0);  
+        createLine(W * 2, T, 0, -L); 
+        createLine(W * 2, T, 0, L);  
+        createLine(W * 2, T, 0, 0);  
+
+        // NET VISUAL
+        const net = new THREE.Mesh(new THREE.BoxGeometry(CONFIG.netWidth, CONFIG.netHeight, CONFIG.netDepth), mNet);
+        net.position.y = CONFIG.netHeight / 2;
+        net.castShadow = true;
+        scene.add(net);
+
+        // --- PLAYER ---
+        const playerObj = new THREE.Group();
+        scene.add(playerObj);
+
+        // Player Hitbox
+        const pWidth = 1.5;
+        const pHeight = 2.6;
+        const pDepth = 1.5;
+        
+        const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(pWidth, pHeight, pDepth), mPlayer);
+        bodyMesh.position.y = 1.3;
+        bodyMesh.castShadow = true;
+        playerObj.add(bodyMesh);
+
+        const camPivot = new THREE.Object3D();
+        camPivot.position.set(0, 3.0, 0);
+        playerObj.add(camPivot);
+        camPivot.add(camera);
+        camera.position.set(0.6, 0.3, 4.0); 
+
+        let pVel = new THREE.Vector3(0,0,0);
+        let onGround = true;
+        let tiltState = { x: 0, z: 0 };
+
+        // --- BALL & TRAIL ---
+        const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(CONFIG.ballRadius, 32, 32), mBall);
+        ballMesh.castShadow = true;
+        scene.add(ballMesh);
+        
+        let ballPos = new THREE.Vector3(0, 6, 8);
+        let ballVel = new THREE.Vector3(0, 0, 0);
+        
+        // --- PHYSICS VARIABLES ---
+        let activeCurve = new THREE.Vector3(0, 0, 0); 
+        let curveAccumulator = new THREE.Vector3(0, 0, 0);
+        let pendingSideCurve = new THREE.Vector3(0, 0, 0); 
+        let pendingCurveY = 0; 
+        let curveDelay = 0; 
+        let isAntiGravity = false;
+
+        const shadow = new THREE.Mesh(new THREE.CircleGeometry(CONFIG.ballRadius, 16), new THREE.MeshBasicMaterial({color:0x000000, opacity:0.4, transparent:true}));
+        shadow.rotation.x = -Math.PI/2;
+        shadow.position.y = 0.05;
+        scene.add(shadow);
+
+        const trailParticles = [];
+        function spawnTrail() {
+            if(ballVel.length() < 0.1) return;
+            const t = new THREE.Mesh(
+                new THREE.BoxGeometry(0.25, 0.25, 0.25),
+                new THREE.MeshBasicMaterial({color: 0xffff00, transparent: true, opacity: 0.6})
+            );
+            t.position.copy(ballPos);
+            scene.add(t);
+            trailParticles.push({ mesh: t, life: 0.8 });
+        }
+
+        function updateTrail() {
+            for (let i = trailParticles.length - 1; i >= 0; i--) {
+                const p = trailParticles[i];
+                p.life -= 0.05;
+                p.mesh.material.opacity = p.life * 0.6;
+                p.mesh.scale.setScalar(p.life);
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    trailParticles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- MENU LOGIC ---
+        const mainMenu = document.getElementById('main-menu');
+        const hud = document.getElementById('hud');
+        const crosshair = document.getElementById('crosshair');
+        const styleInd = document.getElementById('style-indicator');
+
+        function startGame(style) {
+            GAME_STYLE = style;
+            styleInd.innerText = "[" + style + "]";
+            mainMenu.style.display = 'none';
+            hud.style.display = 'block';
+            crosshair.style.display = 'block';
+            document.body.requestPointerLock();
+            isGameRunning = true;
+        }
+
+        document.getElementById('btn-normal').onclick = () => startGame('NORMAL');
+        document.getElementById('btn-curve').onclick = () => startGame('CURVE');
+
+        // --- INPUTS ---
+        const keys = {};
+        
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement !== document.body && isGameRunning) {
+                isGameRunning = false;
+                mainMenu.style.display = 'flex';
+                hud.style.display = 'none';
+                crosshair.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('mousemove', e => {
+            if(!isGameRunning) return;
+            playerObj.rotation.y -= e.movementX * CONFIG.sensitivity;
+            camPivot.rotation.x -= e.movementY * CONFIG.sensitivity;
+            camPivot.rotation.x = Math.max(-1.4, Math.min(1.2, camPivot.rotation.x));
+        });
+
+        window.addEventListener('keydown', e => {
+            const k = e.key.toLowerCase();
+            keys[k] = true;
+            if(isGameRunning) {
+                if(k === 'g') summonBall();
+                if(k === 'e') handleHit("set"); 
+            }
+        });
+        
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+        window.addEventListener('mousedown', () => { if(isGameRunning) handleHit("spike"); });
+
+        // --- LOGIC ---
+
+        function summonBall() {
+            ballPos.set(playerObj.position.x, playerObj.position.y + 18, playerObj.position.z);
+            ballVel.set(0,0,0);
+            
+            // RESET PHYSICS
+            activeCurve.set(0,0,0); 
+            curveAccumulator.set(0,0,0);
+            pendingSideCurve.set(0,0,0);
+            pendingCurveY = 0;
+            curveDelay = 0;
+            isAntiGravity = false;
+            
+            trailParticles.forEach(p => scene.remove(p.mesh));
+            trailParticles.length = 0;
+        }
+
+        function createMarker(pos, isGood) {
+            const color = isGood ? 0x00ff00 : 0xff0000;
+            const g = new THREE.RingGeometry(0.5, 0.7, 32);
+            const m = new THREE.MeshBasicMaterial({ color: color, side: THREE.DoubleSide, transparent: true });
+            const mesh = new THREE.Mesh(g, m);
+            mesh.rotation.x = -Math.PI/2;
+            mesh.position.copy(pos);
+            mesh.position.y = 0.06;
+            scene.add(mesh);
+            
+            let op = 1;
+            const t = setInterval(() => {
+                op -= 0.02;
+                mesh.material.opacity = op;
+                mesh.scale.multiplyScalar(1.02);
+                if(op <= 0) { clearInterval(t); scene.remove(mesh); }
+            }, 30);
+        }
+
+        function updatePlayer() {
+            const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(playerObj.quaternion);
+            const right = new THREE.Vector3(1,0,0).applyQuaternion(playerObj.quaternion);
+
+            if (onGround) {
+                if(keys['w']) pVel.addScaledVector(fwd, CONFIG.moveSpeed * 0.15);
+                if(keys['s']) pVel.addScaledVector(fwd, -CONFIG.moveSpeed * 0.15);
+                if(keys['a']) pVel.addScaledVector(right, -CONFIG.moveSpeed * 0.15);
+                if(keys['d']) pVel.addScaledVector(right, CONFIG.moveSpeed * 0.15);
+                
+                pVel.multiplyScalar(CONFIG.friction);
+                tiltState.x *= 0.8;
+                tiltState.z *= 0.8;
+
+                if(keys[' ']) {
+                    pVel.y = CONFIG.jumpForce;
+                    onGround = false;
+                }
+            } else {
+                pVel.multiplyScalar(CONFIG.airDrag);
+                let tx = 0, tz = 0;
+                if(keys['w']) tx = -0.5;
+                if(keys['s']) tx = 0.5;
+                if(keys['a']) tz = 0.4; 
+                if(keys['d']) tz = -0.4; 
+                tiltState.x += (tx - tiltState.x) * 0.1;
+                tiltState.z += (tz - tiltState.z) * 0.1;
+            }
+
+            pVel.y -= CONFIG.gravity;
+            
+            const nextPos = playerObj.position.clone().add(pVel);
+            
+            const pCollisionDist = (pDepth / 2) + (CONFIG.netDepth / 2);
+            if (nextPos.y < CONFIG.netHeight) {
+                if (Math.abs(nextPos.x) < CONFIG.netWidth / 2) { 
+                    if (Math.abs(nextPos.z) < pCollisionDist) {
+                        if (playerObj.position.z > 0) nextPos.z = Math.max(nextPos.z, pCollisionDist);
+                        else nextPos.z = Math.min(nextPos.z, -pCollisionDist);
+                        pVel.z = 0;
+                    }
+                }
+            }
+            
+            playerObj.position.copy(nextPos);
+
+            if(playerObj.position.y < 0) {
+                playerObj.position.y = 0;
+                pVel.y = 0;
+                onGround = true;
+            }
+
+            bodyMesh.rotation.x = tiltState.x;
+            bodyMesh.rotation.z = tiltState.z;
+        }
+
+        let hitCooldown = 0;
+
+        function handleHit(type) {
+            if(hitCooldown > 0) return;
+            if(playerObj.position.distanceTo(ballPos) > CONFIG.hitRadius) return;
+            
+            const aimDir = new THREE.Vector3(0,0,-1).applyQuaternion(playerObj.quaternion);
+            aimDir.y = 0; 
+            aimDir.normalize();
+
+            const pRight = new THREE.Vector3(1,0,0).applyQuaternion(playerObj.quaternion);
+            const pFwd = new THREE.Vector3(0,0,-1).applyQuaternion(playerObj.quaternion);
+
+            // RESET
+            activeCurve.set(0,0,0);
+            curveAccumulator.set(0,0,0);
+            pendingSideCurve.set(0,0,0);
+            pendingCurveY = 0;
+            curveDelay = 0;
+            isAntiGravity = false;
+
+            if (type === "set") {
+                ballVel.set(0, 0, 0); 
+                ballVel.y = CONFIG.setPower; 
+                const setStrength = 0.12; 
+                if (keys['a']) ballVel.addScaledVector(pRight, -setStrength); 
+                if (keys['d']) ballVel.addScaledVector(pRight, setStrength); 
+                if (keys['w']) ballVel.addScaledVector(pFwd, setStrength);   
+                if (keys['s']) ballVel.addScaledVector(pFwd, -setStrength); 
+            } 
+            else if (type === "spike") {
+                if (!onGround) {
+                    let power = CONFIG.spikePower; 
+                    let down = -0.2; 
+                    const mag = CONFIG.curveStrength; 
+
+                    if (GAME_STYLE === 'NORMAL') {
+                        if (keys['w']) { down = -0.7; power *= 0.8; }
+                        else if (keys['s']) { down = -0.1; power *= 1.3; }
+                        ballVel.copy(aimDir).multiplyScalar(power);
+                        ballVel.y = down; 
+                    } 
+                    else if (GAME_STYLE === 'CURVE') {
+                        
+                        // INITIAL CHECK - Is this a Drop/Curve (S Key)?
+                        if (keys['s']) { 
+                            // 1. SET THE DELAY (45 frames = ~750ms)
+                            curveDelay = 45; 
+                            isAntiGravity = true; 
+                            
+                            // 2. MATCH "NORMAL" S-SPIKE START
+                            down = -0.1; 
+                            power *= 1.3; 
+                            
+                            // 3. CALCULATE THE DELAYED CURVE BACK
+                            const backForce = aimDir.clone().multiplyScalar(-1);
+                            
+                            // Strong Curve Back
+                            pendingSideCurve.addScaledVector(backForce, mag * 8.0); 
+                            pendingCurveY = -mag * 3.5; 
+                        } 
+                        else {
+                            // Non-S behavior (Curve Mode Defaults)
+                            power *= 0.75; // Slower start for other shots
+
+                            // SIDE CURVES
+                            let sideMag = mag * 4.0; 
+                            if (keys['a']) pendingSideCurve.addScaledVector(pRight, -sideMag); 
+                            if (keys['d']) pendingSideCurve.addScaledVector(pRight, sideMag);
+
+                            if (keys['a'] || keys['d']) curveDelay = 3; 
+
+                            if (keys['w']) {
+                                // LINEAR BOUNCE - No Curve
+                                down = -0.6; 
+                                power *= 0.8;
+                            } 
+                            else {
+                                activeCurve.y -= mag * 2.0; 
+                            }
+                        }
+                        
+                        ballVel.copy(aimDir).multiplyScalar(power);
+                        ballVel.y = down; 
+                    }
+                } else {
+                    ballVel.set(0, 0.45, 0);
+                    ballVel.addScaledVector(aimDir, 0.2);
+                }
+            }
+            
+            hitCooldown = 15;
+        }
+
+        function updateBall() {
+            if(hitCooldown > 0) hitCooldown--;
+
+            // GRAVITY LOGIC
+            if (!(isAntiGravity && curveDelay > 0)) {
+                ballVel.y -= CONFIG.gravity;
+            }
+            
+            if (GAME_STYLE === 'CURVE') {
+                if (curveDelay > 0) {
+                    curveDelay--; 
+                    if (curveDelay <= 0) {
+                        // Apply the drops and the BACKWARD FORCE
+                        activeCurve.y += pendingCurveY;
+                        activeCurve.add(pendingSideCurve);
+                        isAntiGravity = false; 
+                    }
+                }
+                curveAccumulator.add(activeCurve);
+                ballVel.add(curveAccumulator);
+            }
+
+            ballPos.add(ballVel);
+            
+            // --- BALL NET COLLISION ---
+            const netHalfW = CONFIG.netWidth / 2;
+            const collisionDistZ = (CONFIG.netDepth / 2) + CONFIG.ballRadius;
+            
+            if (Math.abs(ballPos.x) < netHalfW + CONFIG.ballRadius) {
+                if (ballPos.y < CONFIG.netHeight + CONFIG.ballRadius) {
+                    if (Math.abs(ballPos.z) < collisionDistZ) {
+                        
+                        // Check if hitting the TOP of the net
+                        if (ballPos.y > CONFIG.netHeight) {
+                            ballPos.y = CONFIG.netHeight + CONFIG.ballRadius;
+                            // 150% Velocity Boost Upwards (Pinball Effect)
+                            ballVel.y = Math.abs(ballVel.y) * 1.5 + 0.1; 
+                            ballVel.z *= 0.8; 
+                        } 
+                        // Check if hitting the SIDE of the net
+                        else {
+                            // 150% Velocity Boost Backwards (Pinball Effect)
+                            ballVel.z *= -1.5; 
+                            
+                            // Prevent getting stuck inside
+                            if (ballPos.z > 0) ballPos.z = collisionDistZ + 0.05;
+                            else ballPos.z = -collisionDistZ - 0.05;
+                            
+                            // Reset curves on net hit so it flies predictably
+                            activeCurve.set(0,0,0);
+                            curveAccumulator.set(0,0,0);
+                            pendingSideCurve.set(0,0,0);
+                            isAntiGravity = false;
+                        }
+                    }
+                }
+            }
+
+            ballMesh.position.copy(ballPos);
+            shadow.position.set(ballPos.x, 0.05, ballPos.z);
+            spawnTrail();
+
+            if(ballPos.y < CONFIG.ballRadius) {
+                ballPos.y = CONFIG.ballRadius;
+                if(ballVel.length() > 0.1) {
+                    if(ballPos.z < -0.5) {
+                        const maxW = CONFIG.courtW + (CONFIG.lineThick/2) + CONFIG.ballRadius;
+                        const maxL = CONFIG.courtL + (CONFIG.lineThick/2) + CONFIG.ballRadius;
+                        const inX = Math.abs(ballPos.x) <= maxW;
+                        const inZ = Math.abs(ballPos.z) <= maxL; 
+                        createMarker(ballPos, (inX && inZ));
+                    }
+                }
+                ballVel.set(0,0,0);
+                activeCurve.set(0,0,0);
+                curveAccumulator.set(0,0,0);
+                pendingSideCurve.set(0,0,0);
+                isAntiGravity = false;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(!isGameRunning) return;
+
+            updatePlayer();
+            updateBall();
+            updateTrail();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
