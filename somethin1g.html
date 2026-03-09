@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	
+	<style>
+		
+		#train{
+display: flex;
+gap: 12px;
+		}
+
+		.cart{
+border: 1px solid black;
+min-width: 100px;
+height:  30px;
+text-align: center;
+position: relative;
+
+
+		}
+.cart:before {
+content: "";
+width: 30px;
+height: 30px;
+border: 1px solid black;
+display: block;
+border-radius: ;
+
+}
+
+
+	</style>
+</head>
+
+
+<body>
+
+<script type="text/javascript">
+
+
+let array_length = 8
+let i = Math.floor(Math.random() * array_length);
+
+
+
+let A1 = {
+class: "Mandarin",
+grade: 96,
+}
+let A2 = {
+class: "Biology",
+grade: 95,
+}
+let A3 = {
+class: "Mathematics Team",
+grade: 91,
+}
+
+let B1 = {
+class: "Mathematics",
+grade: 89,
+}
+let B2 = {
+class: "Photography",
+grade: 87,
+}
+let B3 = {
+class: "Computer Science",
+grade: 82,
+}
+let B4 = {
+class: "English",
+grade: 84,
+}
+
+let give_up1 = {
+class: "History",
+grade: "dont even want to know",
+}
+
+let classes = [ A1.class, A2.class, A3.class, B1.class, B2.class, B3.class, B4.class, give_up1.class]
+let grades = [A1.grade, A2.grade, A3.grade, B1.grade, B2.grade, B3.grade, B4.grade, give_up1.grade]
+
+console.log(classes[i])
+console.log(grades[i])
+
+
+</script>
+
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
