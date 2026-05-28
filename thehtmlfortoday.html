@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.2.3-rc.0/lib/p5.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.2.3-rc.0/lib/p5.webgpu.js"></script>
+</head>
+<body>
+<script>
+	let xpos
+	let ypos
+	let xspeed
+	let yspeed
+	let d
+	function setup() {
+margin: 0;
+padding: 0;
+createCanvas(1500,800)
+xpos = width/2
+ypos = height/2
+xspeed = 20
+yspeed = 8
+d = 50
+}
+
+function draw(){
+background(200)
+if (xpos + d/2 > width || xpos - d/2 < 0){fill(floor(random(0, 256)), floor(random(0, 256)), floor(random(0, 256)))}
+if (ypos + d/2 > height || ypos - d/2 < 0){fill(floor(random(0, 256)), floor(random(0, 256)), floor(random(0, 256)))}
+
+if (xpos + d/2 > width || xpos - d/2 < 0){
+	xspeed *= -1
+}
+if (ypos + d/2 > height || ypos - d/2 < 0){
+	yspeed *= -1
+}
+xpos += xspeed
+ypos += yspeed
+
+circle(xpos, ypos, d)
+
+}
+
+
+</script>
+</body>
+</html>

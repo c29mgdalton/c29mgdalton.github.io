@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>something clicker</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --accent: #f59e0b;
+            --text: #f8fafc;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar stats */
+        .stats-panel {
+            width: 30%;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-right: 2px solid #334155;
+            padding: 20px;
+        }
+
+        .main-score { font-size: 3.5rem; font-weight: 800; color: var(--accent); }
+        .sub-stat { font-size: 1rem; color: #94a3b8; margin-top: 10px; }
+
+        /* Clicking Area */
+        .click-area {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #big-button {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #fbbf24 0%, #f59e0b 100%);
+            border: 8px solid #b45309;
+            cursor: pointer;
+            box-shadow: 0 0 50px rgba(245, 158, 11, 0.2);
+            transition: transform 0.05s;
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: #451a03;
+        }
+
+        #big-button:active { transform: scale(0.92); }
+
+        /* Upgrade Shop */
+        .shop-panel {
+            width: 35%;
+            padding: 20px;
+            overflow-y: auto;
+            background: var(--panel);
+        }
+
+        .upgrade-card {
+            background: #334155;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .upgrade-info h4 { margin: 0; color: #fff; }
+        .upgrade-info p { margin: 5px 0 0; font-size: 0.8rem; color: #cbd5e1; }
+
+        button.buy-btn {
+            background: var(--accent);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button.buy-btn:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
+
+        .section-title {
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            color: var(--accent);
+            margin: 20px 0 10px;
+            border-bottom: 1px solid #334155;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="stats-panel">
+        <div class="main-score" id="display-score">0</div>
+        <div class="sub-stat">Points Per Second: <span id="display-pps">0</span></div>
+        <div class="sub-stat">Global Multiplier: <span id="display-mult">1.0</span>x</div>
+    </div>
+
+    <div class="click-area">
+        <button id="big-button">click</button>
+    </div>
+
+    <div class="shop-panel">
+        <div class="section-title">Generators</div>
+        <div id="gen-container"></div>
+
+        <div class="section-title">Multipliers</div>
+        <div id="mult-container"></div>
+    </div>
+
+    <script>
+        let score = 0;
+        let globalMult = 1.0;
+
+       const generators = [
+            { id: 0, name: "Auto-Clicker", baseCost: 15, power: 1, owned: 0 },
+            { id: 1, name: "Point Drill", baseCost: 100, power: 8, owned: 0 },
+            { id: 2, name: "Industrial Siphon", baseCost: 1100, power: 47, owned: 0 },
+            { id: 3, name: "Quantum Computer", baseCost: 12000, power: 260, owned: 0 },
+            { id: 4, name: "Galactic Harvester", baseCost: 150000, power: 1400, owned: 0 }
+        ];
+
+        const multipliers = [
+            { id: 0, name: "Sugar Rush", baseCost: 500, multAdd: 0.5, owned: 0 },
+            { id: 1, name: "Nuclear Fusion", baseCost: 5000, multAdd: 1.5, owned: 0 },
+            { id: 2, name: "Reality Warp", baseCost: 75000, multAdd: 5.0, owned: 0 },
+            { id: 3, name: "Dimension Fold", baseCost: 1000000, multAdd: 25.0, owned: 0 }
+        ];
+
+        // UI Initialization
+        const genBox = document.getElementById('gen-container');
+        const multBox = document.getElementById('mult-container');
+
+        function initUI() {
+            generators.forEach(g => {
+                genBox.innerHTML += `
+                    <div class="upgrade-card">
+                        <div class="upgrade-info">
+                            <h4>${g.name}</h4>
+                            <p>+${g.power} base/sec | Owned: <span id="g-own-${g.id}">0</span></p>
+                        </div>
+                        <button class="buy-btn" id="g-btn-${g.id}" onclick="buyGen(${g.id})">Cost: ${g.baseCost}</button>
+                    </div>`;
+            });
+
+            multipliers.forEach(m => {
+                multBox.innerHTML += `
+                    <div class="upgrade-card">
+                        <div class="upgrade-info">
+                            <h4>${m.name}</h4>
+                            <p>+${m.multAdd} to Global Mult</p>
+                        </div>
+                        <button class="buy-btn" id="m-btn-${m.id}" onclick="buyMult(${m.id})">Cost: ${m.baseCost}</button>
+                    </div>`;
+            });
+        }
+
+        function buyGen(id) {
+            let g = generators[id];
+            let cost = Math.floor(g.baseCost * Math.pow(1.15, g.owned));
+            if (score >= cost) {
+                score -= cost;
+                g.owned++;
+                updateDisplay();
+            }
+        }
+
+        function buyMult(id) {
+            let m = multipliers[id];
+            let cost = Math.floor(m.baseCost * Math.pow(2.5, m.owned));
+            if (score >= cost) {
+                score -= cost;
+                m.owned++;
+                globalMult += m.multAdd;
+                updateDisplay();
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('display-score').innerText = Math.floor(score).toLocaleString();
+            document.getElementById('display-mult').innerText = globalMult.toFixed(1);
+            
+            // Update Generator Buttons
+            generators.forEach(g => {
+                let cost = Math.floor(g.baseCost * Math.pow(1.15, g.owned));
+                let btn = document.getElementById(`g-btn-${g.id}`);
+                btn.innerText = `Cost: ${cost.toLocaleString()}`;
+                btn.disabled = score < cost;
+                document.getElementById(`g-own-${g.id}`).innerText = g.owned;
+            });
+
+            // Update Multiplier Buttons
+            multipliers.forEach(m => {
+                let cost = Math.floor(m.baseCost * Math.pow(2.5, m.owned));
+                let btn = document.getElementById(`m-btn-${m.id}`);
+                btn.innerText = `Cost: ${cost.toLocaleString()}`;
+                btn.disabled = score < cost;
+            });
+
+            // Calculate PPS
+            let pps = generators.reduce((acc, g) => acc + (g.owned * g.power), 0) * globalMult;
+            document.getElementById('display-pps').innerText = pps.toLocaleString();
+            return pps;
+        }
+
+        // Click Logic
+        document.getElementById('big-button').addEventListener('click', () => {
+            score += (1 * globalMult);
+            updateDisplay();
+        });
+
+        // Game Loop (Ticks every 100ms for smoothness)
+        setInterval(() => {
+            let pps = updateDisplay();
+            score += (pps / 10);
+        }, 100);
+
+        initUI();
+    </script>
+</body>
+</html>

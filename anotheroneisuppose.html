@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.2.3-rc.0/lib/p5.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/p5@2.2.3-rc.0/lib/p5.webgpu.js"></script>
+</head>
+<body>
+<script>
+	let xpos
+	let ypos
+	function setup(){
+createCanvas(1200, 1200)
+background(220)
+
+xpos = width/2
+ypos = height/2
+
+	}
+
+function draw(){ 
+	frameRate(60)
+circle(xpos, ypos, 10)
+let randomNumber = floor(random(10))
+let randomColor  = random(["darkblue", "cyan", "purple", "blue"])
+
+if (randomNumber == 0){
+	xpos = xpos + 20
+} else if (randomNumber == 1){
+	xpos = xpos - 20
+} else if (randomNumber == 2){
+    ypos = ypos + 20
+} else if (randomNumber == 3){
+    ypos = ypos - 20
+}
+
+fill(randomColor)
+}
+
+</script>
+</body>
+</html>
